@@ -1,0 +1,50 @@
+
+
+<html>
+    <head>
+        <style>
+            #map {
+                width: 500px;
+                height: 256px;
+            }
+            .button {
+                background-color: #888;
+                font: bold 16px Helvetica;
+                padding: 5px 10px;
+                width: 10px;
+                color: white;
+                text-decoration: none;
+                border-radius: 3px;
+                display: inline-block;
+                text-align: center;
+            }
+            .button:hover {
+                background-color: #BBB;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="map"></div>
+        <a id="plus" href="#" class="button">+</a>
+        <a id="minus" href="#" class="button">-</a>
+    </body>
+
+    <script src="gmaps_mercator.js"></script>
+    <script src="map.js"></script>
+    <script>
+        map = new Map(document.getElementById('map'), {
+            center: new LatLng(41.69, -4.83),
+            zoom: 10
+        });
+        document.getElementById('plus').onclick = function() {
+            map.model.setZoom(map.model.zoom + 1);
+            return false;
+        }
+        document.getElementById('minus').onclick = function() {
+            map.model.setZoom(map.model.zoom - 1);
+            return false;
+        }
+
+    </script>
+</html>
