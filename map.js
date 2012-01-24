@@ -89,20 +89,35 @@ function dragger(el) {
     var dragging = false;
     var x, y;
 
-    el.onmousedown = function(e) {
+    el.ontouchstart = el.onmousedown = function(e) {
         dragging = true;
-        x = e.clientX;
-        y = e.clientY;
+        if (e.touches) {
+            var p = e.touches[0];
+            x = p.pageX;
+            y = p.pageY;
+        } else {
+            x = e.clientX;
+            y = e.clientY;
+        }
         self.emit('startdrag', x, y);
     };
 
-    el.onmousemove = function(e) {
+    el.ontouchmove = el.onmousemove = function(e) {
+        var xx, yy;
         if(!dragging) return;
-        self.emit('move', e.clientX - x, e.clientY - y);
+        if (e.touches) {
+            var p = e.touches[0];
+            xx = p.pageX;
+            yy = p.pageY;
+        } else {
+            xx = e.clientX;
+            yy = e.clientY;
+        }
+        self.emit('move', xx - x, yy - y);
         return false;
     };
 
-    el.onmouseup = function(e) {
+    el.ontouchend = el.onmouseup = function(e) {
         dragging = false;
     };
 }
