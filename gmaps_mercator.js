@@ -14,6 +14,10 @@
       this.lng = lng;
   }
 
+  LatLng.prototype.clone = function() {
+      return new LatLng(this.lat, this.lng);
+  }
+
   var TILE_SIZE = 256;
 
   MercatorProjection.prototype.TILE_SIZE = TILE_SIZE;

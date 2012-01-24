@@ -1,4 +1,14 @@
 
+window.requestAnimFrame = (function(){
+      return  window.requestAnimationFrame       || 
+              window.webkitRequestAnimationFrame || 
+              window.mozRequestAnimationFrame    || 
+              window.oRequestAnimationFrame      || 
+              window.msRequestAnimationFrame     || 
+              function( callback ){
+                window.setTimeout(callback, 1000 / 60);
+              };
+    })();
 
 function Event() {}
 Event.prototype.on = function(evt, callback) { 
@@ -73,30 +83,99 @@ MapModel.prototype.visibleTiles = function(width, height) {
 
 }
 
-function CanvasRenderer(el) {
+function dragger(el) {
+
+    var self = this;
+    var dragging = false;
+    var x, y;
+
+    el.onmousedown = function(e) {
+        dragging = true;
+        x = e.clientX;
+        y = e.clientY;
+        self.emit('startdrag', x, y);
+    };
+
+    el.onmousemove = function(e) {
+        if(!dragging) return;
+        self.emit('move', e.clientX - x, e.clientY - y);
+        return false;
+    };
+
+    el.onmouseup = function(e) {
+        dragging = false;
+    };
+}
+
+dragger.prototype = new Event();
+
+function CanvasRenderer(el, map) {
+    var self = this;
     this.el = el;
-    this.width = el.offsetWidth;
-    this.height = el.offsetHeight;
-    var widthHalf = this.width / 2;
-    var heightHalf = this.height / 2;
+    this.width = el.offsetWidth >> 0;
+    this.height = el.offsetHeight >> 0;
+    var widthHalf = (this.width / 2) >> 0;
+    var heightHalf = (this.height / 2) >> 0;
+
     var canvas = this.canvas = document.createElement('canvas');
+    canvas.style.padding = '0';
+    canvas.style.margin= '0';
+    canvas.style.position = 'absolute';
     canvas.width = this.width;
     canvas.height = this.height;
+
     var context = canvas.getContext( '2d' );
     context.translate( widthHalf, heightHalf );
     this.context = context;
-    el.appendChild(canvas);
+
+    var div = document.createElement('div');
+    div.style.width = this.width + "px";
+    div.style.height= this.height + "px";
+    div.style.position = 'relative';
+    div.appendChild(canvas);
+    el.appendChild(div);
+
+    this.center_init = null;
+    this.target_center = new LatLng();
+    this.drag = new dragger(div);
+    this.drag.on('startdrag', function() {
+        self.center_init = map.center.clone();
+    });
+
+    function go_to_target() {
+        var c = map.center;
+        var t = self.target_center;
+        var dlat = t.lat - c.lat;
+        var dlon = t.lng - c.lng;
+        t.lat += dlat*0.001;
+        t.lng += dlon*0.001;
+        map.setCenter(t);
+        if(Math.abs(dlat) + Math.abs(dlon) > 0.00001) {
+            requestAnimFrame(go_to_target);
+        }
+    }
+
+    this.drag.on('move', function(dx, dy) {
+        var t = 1 << map.zoom;
+        var s = 1/t;
+        s = s/map.projection.pixelsPerLonDegree_;
+        self.target_center.lat = self.center_init.lat + dy*s;
+        self.target_center.lng = self.center_init.lng - dx*s;
+        requestAnimFrame(go_to_target);
+    });
+
 }
 
 
 CanvasRenderer.prototype.renderTile = function(tile, at) {
     var self = this;
-    var layer = 'http://a.tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/997/256/{{z}}/{{x}}/{{y}}.png';
+    //var layer = 'http://a.tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/997/256/{{z}}/{{x}}/{{y}}.png';
+    var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
     var url = layer.replace('{{z}}', tile.zoom).replace('{{x}}', tile.i).replace('{{y}}', tile.j);
     var img = new Image();
     img.src = url;
     img.onload = function() {
-        self.context.drawImage(img, at.x, at.y+1);
+        self.context.drawImage(img, at.x, at.y);
     };
 }
 
@@ -117,7 +196,7 @@ function Map(el, opts) {
         center: opts.center || new LatLng(41.69, -4.83),
         zoom: opts.zoom || 1
     });
-    this.view = new CanvasRenderer(el);
+    this.view = new CanvasRenderer(el, this.model);
     function render() {
         var tiles = self.model.visibleTiles(self.view.width, self.view.height);
         self.view.renderTiles(tiles, this.center_pixel);

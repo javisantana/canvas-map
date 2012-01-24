@@ -3,11 +3,19 @@
 <html>
     <head>
         <style>
+
+            html, body, #map {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+            }
             #map {
-                width: 500px;
-                height: 256px;
+                width: 100%;
+                height: 100%;
             }
             .button {
+                position: absolute;
                 background-color: #888;
                 font: bold 16px Helvetica;
                 padding: 5px 10px;
@@ -17,6 +25,14 @@
                 border-radius: 3px;
                 display: inline-block;
                 text-align: center;
+            }
+            #plus {
+                top: 40px;
+                left: 40px;
+            }
+            #minus {
+                top: 40px;
+                left: 73px;
             }
             .button:hover {
                 background-color: #BBB;
@@ -35,7 +51,7 @@
     <script>
         map = new Map(document.getElementById('map'), {
             center: new LatLng(41.69, -4.83),
-            zoom: 10
+            zoom: 4
         });
         document.getElementById('plus').onclick = function() {
             map.model.setZoom(map.model.zoom + 1);
