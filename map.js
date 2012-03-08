@@ -185,7 +185,9 @@ function CanvasRenderer(el, map) {
 CanvasRenderer.prototype.renderTile = function(tile, at) {
     var self = this;
     //var layer = 'http://a.tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/997/256/{{z}}/{{x}}/{{y}}.png';
-    var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
+    //var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
+    //var layer = 'http://a.tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/997/256/{{z}}/{{x}}/{{y}}.png';
+    var layer = 'http://gsp2.apple.com/tile?api=1&style=slideshow&layers=default&lang=en_EN&z={{z}}&x={{x}}&y={{y}}&v=9';
     var url = layer.replace('{{z}}', tile.zoom).replace('{{x}}', tile.i).replace('{{y}}', tile.j);
     var img = new Image();
     img.src = url;
