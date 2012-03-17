@@ -47,6 +47,34 @@ MapModel.prototype.setZoom = function(zoom) {
     this.emit('zoom_changed', this.center);
 };
 
+MapModel.prototype.getCenterPixel = function() {
+    var center_point = this.projection.fromLatLngToPixel(this.center, this.zoom);
+    return center_point;
+}
+
+MapModel.prototype.getTopLeft = function(width, height) {
+    var center_point = this.projection.fromLatLngToPixel(this.center, this.zoom);
+    var widthHalf = width / 2;
+    var heightHalf = height / 2;
+    center_point.x -= widthHalf;
+    center_point.y -= heightHalf;
+    return center_point;
+}
+MapModel.prototype.getBBox = function(width, height) {
+    var center_point = this.projection.fromLatLngToPixel(this.center, this.zoom);
+    var widthHalf = width / 2;
+    var heightHalf = height / 2;
+    center_point.x -= widthHalf;
+    center_point.y += heightHalf;
+    var bottomleft = this.projection.fromPixelToLatLng(center_point, this.zoom);
+    center_point.x += width;
+    center_point.y -= height;
+    var topRight = this.projection.fromPixelToLatLng(center_point, this.zoom);
+    return [bottomleft, topRight]
+
+}
+
+
 /**
  * return a list of tiles inside the spcified zone
  * the center will be placed on the center of that zone
@@ -127,6 +155,7 @@ dragger.prototype = new Event();
 function CanvasRenderer(el, map) {
     var self = this;
     this.el = el;
+    this.tiles = {};
     this.width = el.offsetWidth >> 0;
     this.height = el.offsetHeight >> 0;
     var widthHalf = (this.width / 2) >> 0;
@@ -162,11 +191,13 @@ function CanvasRenderer(el, map) {
         var t = self.target_center;
         var dlat = t.lat - c.lat;
         var dlon = t.lng - c.lng;
-        t.lat += dlat*0.001;
-        t.lng += dlon*0.001;
+        t.lat += dlat*0.0001;
+        t.lng += dlon*0.0001;
         map.setCenter(t);
-        if(Math.abs(dlat) + Math.abs(dlon) > 0.00001) {
+        if(Math.abs(dlat) + Math.abs(dlon) > 0.001) {
             requestAnimFrame(go_to_target);
+        } else {
+            map.emit('end_move');
         }
     }
 
@@ -184,6 +215,12 @@ function CanvasRenderer(el, map) {
 
 CanvasRenderer.prototype.renderTile = function(tile, at) {
     var self = this;
+    var key = at.x + '_' + at.y
+    if(a=self.tiles[key]) {
+        self.context.drawImage(a, at.x, at.y);
+        return;
+    }
+
     //var layer = 'http://a.tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/997/256/{{z}}/{{x}}/{{y}}.png';
     var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
     var url = layer.replace('{{z}}', tile.zoom).replace('{{x}}', tile.i).replace('{{y}}', tile.j);
@@ -191,6 +228,7 @@ CanvasRenderer.prototype.renderTile = function(tile, at) {
     img.src = url;
     img.onload = function() {
         self.context.drawImage(img, at.x, at.y);
+        self.tiles[key] = img;
     };
 }
 
@@ -212,12 +250,13 @@ function Map(el, opts) {
         zoom: opts.zoom || 1
     });
     this.view = new CanvasRenderer(el, this.model);
-    function render() {
+    /*function render() {
         var tiles = self.model.visibleTiles(self.view.width, self.view.height);
         self.view.renderTiles(tiles, this.center_pixel);
     }
     this.model.on('center_changed', render);
     this.model.on('zoom_changed', render);
     this.model.emit('center_changed');
+    */
 }
 

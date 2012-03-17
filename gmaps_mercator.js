@@ -93,6 +93,15 @@
         var py = y*TILE_SIZE;
         return [px, py];
   }
+  MercatorProjection.prototype.fromPixelToLatLng = function(pixel, zoom) {
+        var numTiles = 1 << zoom;
+        var p = new Point(
+                pixel.x/numTiles,
+                pixel.y/numTiles);
+        return this.fromPointToLatLng(p);
+
+
+  }
 
   MercatorProjection.prototype.toPixelCoordinate = function(worldCoordinate, zoom) {
         var numTiles = 1 << zoom;
