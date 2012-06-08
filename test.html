@@ -51,12 +51,15 @@
     <script src="map.js"></script>
     <script src="dragger.js"></script>
     <script src="canvas_renderer.js"></script>
+    <script src="webgl.js"></script>
     <script>
         var map = new Map({
             center: new LatLng(41.69, -4.83),
             zoom: 4
         });
-        var view = new CanvasRenderer(document.getElementById('map'), map.model);
+        ////var view = new CanvasRenderer(document.getElementById('map'), map.model);
+        var view = new WebGLRenderer(document.getElementById('map'), map.model);
+        map.model.setCenter(map.model.center);
         document.getElementById('plus').onclick = function() {
             map.model.setZoom(map.model.zoom + 1);
             return false;

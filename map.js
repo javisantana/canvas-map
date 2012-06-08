@@ -79,6 +79,14 @@ MapModel.prototype.visibleTiles = function(width, height) {
             });
         }
     }
+    // by distance to center
+    tiles.sort(function(a, b) {
+        var ox =  (widthHalf/self.projection.TILE_SIZE)|0;
+        var oy =  (heightHalf/self.projection.TILE_SIZE)|0;
+        var da = Math.abs(a.i - tile.x - ox ) + Math.abs(a.j - tile.y -oy);
+        var db = Math.abs(b.i - tile.x - ox) + Math.abs(b.j - tile.y -oy);
+        return da > db;
+    });
     return tiles;
 
 };

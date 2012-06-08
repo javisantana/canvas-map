@@ -2,14 +2,26 @@
  * canvas renderer
  */
 
-function CanvasRenderer(el, map) {
+function CanvasRenderer(el, map, ctx_type) {
     var self = this;
+    this.map = map;
     this._createElement(el);
+
+    ctx_type = ctx_type || '2d';
+    var context = this.canvas.getContext(ctx_type);
+    var widthHalf = (this.width / 2) >> 0;
+    var heightHalf = (this.height / 2) >> 0;
+    if(context.translate) {
+        context.translate( widthHalf, heightHalf );
+    }
+    this.context = context;
+    this.image_cache = {};
 
     function render() {
         var tiles = map.visibleTiles(self.width, self.height);
-        self.renderTiles(tiles, this.center_pixel);
+        self.renderTiles(tiles, map.center_pixel);
     }
+    this.render = render;
 
     map.on('center_changed', render);
     map.on('zoom_changed', render);
@@ -43,7 +55,6 @@ function CanvasRenderer(el, map) {
         requestAnimFrame(go_to_target);
     });
 
-    map.setCenter(map.center);
 
 }
 
@@ -51,8 +62,6 @@ CanvasRenderer.prototype._createElement = function(el) {
     this.el = el;
     this.width = el.offsetWidth >> 0;
     this.height = el.offsetHeight >> 0;
-    var widthHalf = (this.width / 2) >> 0;
-    var heightHalf = (this.height / 2) >> 0;
 
     var canvas = this.canvas = document.createElement('canvas');
     canvas.style.padding = '0';
@@ -61,9 +70,6 @@ CanvasRenderer.prototype._createElement = function(el) {
     canvas.width = this.width;
     canvas.height = this.height;
 
-    var context = canvas.getContext( '2d' );
-    context.translate( widthHalf, heightHalf );
-    this.context = context;
 
     var div = document.createElement('div');
     div.style.width = this.width + "px";
@@ -76,16 +82,23 @@ CanvasRenderer.prototype._createElement = function(el) {
 
 CanvasRenderer.prototype.renderTile = function(tile, at) {
     var self = this;
-    //var layer = 'http://a.tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/997/256/{{z}}/{{x}}/{{y}}.png';
     var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
-    //var layer = 'http://a.tile.cloudmade.com/BC9A493B41014CAABB98F0471D759707/997/256/{{z}}/{{x}}/{{y}}.png';
-    //var layer = 'http://gsp2.apple.com/tile?api=1&style=slideshow&layers=default&lang=en_EN&z={{z}}&x={{x}}&y={{y}}&v=9';
+    layer = 'http://tile.stamen.com/toner/{{z}}/{{x}}/{{y}}.png';
     var url = layer.replace('{{z}}', tile.zoom).replace('{{x}}', tile.i).replace('{{y}}', tile.j);
-    var img = new Image();
-    img.src = url;
-    img.onload = function() {
-        self.context.drawImage(img, at.x, at.y);
-    };
+    var i = this.image_cache[url];
+    if(i === undefined) {
+        self.image_cache[url] = null;
+        var img = new Image();
+        img.src = url;
+        img.onload = function() {
+            self.image_cache[url] = img;
+            requestAnimFrame(self.render);
+        };
+    } else {
+        if(i) {
+            self.context.drawImage(i, at.x, at.y);
+        } // else waiting
+    }
 }
 
 CanvasRenderer.prototype.renderTiles = function(tiles, center) {
