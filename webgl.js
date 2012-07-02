@@ -45,6 +45,13 @@ function setBufferData(gl, prog, attr_name, buff) {
   gl.vertexAttribPointer(attr, buff.vSize, gl.FLOAT, false, 0, 0);
 }
 
+function initFB() {
+    var fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    fb.width = 512;
+    fb.height = 512;
+}
+
 function WebGLRenderer(el, map) {
   CanvasRenderer.call(this, el, map, "experimental-webgl");
   this.gl = this.context;
@@ -77,8 +84,8 @@ WebGLRenderer.prototype._init = function() {
           "uniform sampler2D tileImage;"+
           "void main() {"+
           "vec4 c = texture2D(tileImage, vec2(vTextureCoord.s, vTextureCoord.t));"+
-          " c.a = 1.0;"+
-          " c.b = c.b*2.0;"+
+          "c = pow(c, vec4(6.4));"+
+          "c.a = 1.0;"+
           "gl_FragColor = c;"+
           "}"
 
