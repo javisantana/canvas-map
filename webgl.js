@@ -84,7 +84,7 @@ WebGLRenderer.prototype._init = function() {
           "uniform sampler2D tileImage;"+
           "void main() {"+
           "vec4 c = texture2D(tileImage, vec2(vTextureCoord.s, vTextureCoord.t));"+
-          "c = pow(c, vec4(6.4));"+
+          "c = vec4(1.0) - c;" + 
           "c.a = 1.0;"+
           "gl_FragColor = c;"+
           "}"
@@ -119,8 +119,8 @@ function uploadTexture(gl, img) {
 
 WebGLRenderer.prototype.loadImageTile = function(tile) {
     var self = this;
-    var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
-    //layer = 'http://tile.stamen.com/toner/{{z}}/{{x}}/{{y}}.png';
+    //var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
+    layer = 'http://tile.stamen.com/toner/{{z}}/{{x}}/{{y}}.png';
     var url = layer.replace('{{z}}', tile.zoom).replace('{{x}}', tile.i).replace('{{y}}', tile.j);
     var k = tile.zoom + '-' + tile.x + '-' + tile.y;
     var i = this.image_cache[k];
