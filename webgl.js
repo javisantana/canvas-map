@@ -58,7 +58,7 @@ function WebGLRenderer(el, map) {
   this._init();
 }
 
-WebGLRenderer.prototype = CanvasRenderer.prototype;
+WebGLRenderer.prototype = CanvasRenderer.prototype
 
 WebGLRenderer.prototype._init = function() {
         var gl = this.gl;

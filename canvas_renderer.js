@@ -19,6 +19,7 @@ function CanvasRenderer(el, map, ctx_type) {
 
     function render() {
         var tiles = map.visibleTiles(self.width, self.height);
+    //    self.context.clearRect(-widthHalf, -heightHalf, self.width, self.height);
         self.renderTiles(tiles, map.center_pixel);
     }
     this.render = render;
@@ -29,6 +30,8 @@ function CanvasRenderer(el, map, ctx_type) {
     this.center_init = null;
     this.target_center = new LatLng();
     this.drag = new dragger(this.container);
+
+    self.center_init = map.center.clone();
     this.drag.on('startdrag', function() {
         self.center_init = map.center.clone();
     });
@@ -38,11 +41,15 @@ function CanvasRenderer(el, map, ctx_type) {
         var t = self.target_center;
         var dlat = t.lat - c.lat;
         var dlon = t.lng - c.lng;
-        t.lat += dlat*0.001;
-        t.lng += dlon*0.001;
+        var delta_lat = 0.1*dlat;
+        var delta_lon = 0.1*dlon;
+        var w = self.canvas.width;
+        var h = self.canvas.height;
+        t.lat += delta_lat;
+        t.lon += delta_lon;
         map.setCenter(t);
-        if(Math.abs(dlat) + Math.abs(dlon) > 0.00001) {
-            requestAnimFrame(go_to_target);
+        if(Math.abs(dlat) + Math.abs(dlon) > 0.0001) {
+          requestAnimFrame(go_to_target);
         }
     }
 
@@ -54,6 +61,7 @@ function CanvasRenderer(el, map, ctx_type) {
         self.target_center.lng = self.center_init.lng - dx*s;
         requestAnimFrame(go_to_target);
     });
+    //requestAnimFrame(go_to_target);
 
 
 }
@@ -80,11 +88,13 @@ CanvasRenderer.prototype._createElement = function(el) {
     this.container = div;
 };
 
+var style = '#tm_world_borders_simpl_0_18{polygon-fill:#888;line-color:#444;line-opacity: 0.3;}';
+var template = 'http://dev.localhost.lan:8181/tiles/tm_world_borders_simpl_0_18/{z}/{x}/{y}.png?style='+encodeURIComponent(style);
+
 CanvasRenderer.prototype.renderTile = function(tile, at) {
-    var self = this;
-    var layer = 'http://b.tiles.mapbox.com/v3/mapbox.mapbox-light/{{z}}/{{x}}/{{y}}.png64';
-    layer = 'http://tile.stamen.com/toner/{{z}}/{{x}}/{{y}}.png';
-    var url = layer.replace('{{z}}', tile.zoom).replace('{{x}}', tile.i).replace('{{y}}', tile.j);
+  var self = this;
+    var layer = template;
+    var url = layer.replace('{z}', tile.zoom).replace('{x}', tile.i).replace('{y}', tile.j);
     var i = this.image_cache[url];
     if(i === undefined) {
         self.image_cache[url] = null;
