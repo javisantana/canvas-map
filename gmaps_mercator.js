@@ -9,14 +9,6 @@
       return new Point(this.x>>0, this.y>>0);
   }
 
-  function LatLng(lat, lng) {
-      this.lat = lat;
-      this.lng = lng;
-  }
-
-  LatLng.prototype.clone = function() {
-      return new LatLng(this.lat, this.lng);
-  }
 
   var TILE_SIZE = 256;
 
@@ -95,7 +87,7 @@
   }
 
   MercatorProjection.prototype.toPixelCoordinate = function(worldCoordinate, zoom) {
-        var numTiles = 1 << zoom;
+        var numTiles = Math.pow(2, zoom);
         return new Point(
                 worldCoordinate.x * numTiles,
                 worldCoordinate.y * numTiles);

@@ -50,22 +50,94 @@
     <script src="gmaps_mercator.js"></script>
     <script src="map.js"></script>
     <script src="dragger.js"></script>
-    <script src="canvas_renderer.js"></script>
-    <script src="webgl.js"></script>
     <script>
-        var map = new Map({
-            center: new LatLng(41.69, -4.83),
-            zoom: 4
+        var map = new Map(document.getElementById('map'), {
+            center: new LatLng(0, 0),
+            zoom: 0
+        });
+
+        var tmpl = "http://z.localhost.lan:8181/api/v1/map/a66e953420a0a7bf41bcd7eec6cabc6b:1413358457669.22/{z}/{x}/{y}.png?api_key=95c68e3085d245aeeb0d0a4345d3316fd3c8286b"
+
+        function TemplateTiledLayer(template) {
+          this.template = template;
+          TiledLayer.call(this, arguments);
+        }
+
+        FM.extend(TemplateTiledLayer.prototype, TiledLayer.prototype);
+
+        TemplateTiledLayer.prototype.render = function(ctx) {
+          TiledLayer.prototype.render.call(this, ctx);
+          for(var t in this.tiles) {
+          ctx.save();
+          var tile = this.tiles[t];
+          if (1 || tile.zoom === 0 && tile.x === 0 && tile.y === 0) {
+            var s = 1/Math.pow(2, tile.zoom);
+          ctx.transform(s, 0,
+                        0, s,
+              s*tile.x*256 - 128, 
+              s*tile.y*256 - 128)
+                        
+            ctx.strokeRect(0, 0, 256, 256);
+            ctx.fillText(tile.zoom + "/" + tile.x + "/" + tile.y, 
+              0, 
+              0);
+
+            var tile = this.tiles[t];
+            if (!tile.img) {
+              tile._loaded = false;
+              var url = this.template
+                .replace('{z}', tile.zoom)
+                .replace('{x}', tile.x)
+                .replace('{y}', tile.y)
+              tile.img = new Image();
+              tile.img.src = url;
+              tile.img.onload = (function(t) {
+                return function() {
+                  t._loaded = true;
+                //self.root.render();
+                }
+              })(tile)
+              tile.img.onerror = function() {
+                console.log("err", tile.img.src);
+              }
+            }
+            if (tile._loaded) {
+              ctx.drawImage(tile.img, 0, 0);
+            }
+          }
+          ctx.restore()
+          }
+        }
+
+        
+
+        map.layers.base.addObject(new TemplateTiledLayer(tmpl));
+        map.layers.base.addObject({
+          render: function(ctx) {
+            ctx.fillRect(0, 0, 3, 3);
+          }
         });
         //var view = new CanvasRenderer(document.getElementById('map'), map.model);
-        var view = new WebGLRenderer(document.getElementById('map'), map.model);
+        /*var view = new WebGLRenderer(document.getElementById('map'), map.model);
         map.model.setCenter(map.model.center);
+        */
+        function animTo(z) {
+          var i = setInterval(function() {
+            map.zoom += (z - map.zoom)*0.1;
+            map.setZoom(map.zoom)
+            if (map.zoom >= z) {
+              clearInterval(i);
+            }
+          }, 16)
+        }
         document.getElementById('plus').onclick = function() {
-            map.model.setZoom(map.model.zoom + 1);
+            //map.setZoom(map.zoom + 0.25);
+            animTo(map.zoom + 1);
             return false;
         }
         document.getElementById('minus').onclick = function() {
-            map.model.setZoom(map.model.zoom - 1);
+            map.setZoom(map.zoom - 0.25);
+            animTo(map.zoom - 1);
             return false;
         }
 

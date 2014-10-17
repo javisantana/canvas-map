@@ -1,4 +1,48 @@
 /**
+ * return a list of tiles inside the spcified zone
+ * the center will be placed on the center of that zone
+ */
+MapModel.prototype.visibleTiles = function(width, height) {
+    var self = this;
+    var widthHalf = width / 2;
+    var heightHalf = height / 2;
+    var center_point = self.projection.fromLatLngToPixel(self.center, self.zoom);
+    center_point.x -= widthHalf;
+    center_point.y -= heightHalf;
+    var tile = this.projection.pixelToTile(center_point, self.zoom);
+    var offset_x = center_point.x%this.projection.TILE_SIZE;
+    var offset_y = center_point.y%this.projection.TILE_SIZE;
+
+    var num_tiles_x = Math.ceil((width + offset_x)/this.projection.TILE_SIZE);
+    var num_tiles_y = Math.ceil((height + offset_y)/this.projection.TILE_SIZE);
+
+    var tiles = [];
+    for(var i = 0; i < num_tiles_x; ++i) {
+        for(var j = 0; j < num_tiles_y; ++j) {
+            var tile_x = tile.x + i;
+            var tile_y = tile.y + j;
+            tiles.push({
+                x: tile_x * this.projection.TILE_SIZE,
+                y: tile_y * this.projection.TILE_SIZE,
+                zoom: self.zoom,
+                i: tile_x,
+                j: tile_y
+            });
+        }
+    }
+    // by distance to center
+    tiles.sort(function(a, b) {
+        var ox =  (widthHalf/self.projection.TILE_SIZE)|0;
+        var oy =  (heightHalf/self.projection.TILE_SIZE)|0;
+        var da = Math.abs(a.i - tile.x - ox ) + Math.abs(a.j - tile.y -oy);
+        var db = Math.abs(b.i - tile.x - ox) + Math.abs(b.j - tile.y -oy);
+        return da > db;
+    });
+    return tiles;
+
+};
+
+/**
  * canvas renderer
  */
 
