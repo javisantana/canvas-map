@@ -1,22 +1,29 @@
 "use strict";
+// TODO:
+// - remove Point
 
 var FM = typeof module !== 'undefined' ? module.exports : {};
-FM.requestAnimFrame = window.requestAnimationFrame ||
-              window.webkitRequestAnimationFrame ||
-              window.mozRequestAnimationFrame    ||
-              window.oRequestAnimationFrame      ||
-              window.msRequestAnimationFrame     ||
-              function(callback){ return window.setTimeout(callback, 1000 / 60); };
-FM.cancelAnimationFrame = window.requestCancelAnimationFrame || window.mozCancelAnimationFrame || window.webkitCancelAnimationFrame||  function(c) { window.cancelTimeout(c); };
+
+var root = this;
+
+FM.requestAnimFrame = root.requestAnimationFrame ||
+  root.webkitRequestAnimationFrame ||
+  root.mozRequestAnimationFrame    ||
+  root.oRequestAnimationFrame      ||
+  root.msRequestAnimationFrame     ||
+  function(callback){ return root.setTimeout(callback, 1000 / 60); };
+
+FM.cancelAnimationFrame = root.requestCancelAnimationFrame ||
+  root.mozCancelAnimationFrame ||
+  root.webkitCancelAnimationFrame||
+  function(c) { root.cancelTimeout(c); };
 
 FM.extend = function(a, b) {
-  for (var k in b) {
-    a[k] = b[k];
-  }
+  for (var k in b) { a[k] = b[k]; }
   return a;
 };
 
-
+// basic event management
 function Event() {}
 
 Event.prototype = {
@@ -36,6 +43,7 @@ Event.prototype = {
 
 };
 
+// base Node, all the scenegraph objects should inherit this
 function Node() {
   this.objects = [];
   this._objectsKey = {};
@@ -75,6 +83,18 @@ Node.prototype = {
       o[i].render(ctx);
     }
     return this;
+  },
+
+  update: function(dt) {
+    var o = this.objects;
+    for (var i = 0, l = this.objects.length; i < l; ++i) {
+      o[i].update(dt);
+    }
+    return this;
+  },
+
+  requestRender: function() {
+    this.parent && this.parent.requestRender();
   }
 
 };
@@ -132,19 +152,19 @@ function Layer(container, map) {
 FM.extend(Layer.prototype, Node.prototype);
 
 Layer.prototype._createElement = function(el) {
-    var canvas = this.canvas = document.createElement('canvas');
-    canvas.style.padding = '0';
-    canvas.style.margin= '0';
-    canvas.style.position = 'absolute';
-    canvas.width = this.width;
-    canvas.height = this.height;
+  var canvas = this.canvas = document.createElement('canvas');
+  canvas.style.padding = '0';
+  canvas.style.margin= '0';
+  canvas.style.position = 'absolute';
+  canvas.width = this.width;
+  canvas.height = this.height;
 
-    var div = document.createElement('div');
-    div.style.width = this.width + "px";
-    div.style.height= this.height + "px";
-    div.style.position = 'relative';
-    div.appendChild(canvas);
-    return div;
+  var div = document.createElement('div');
+  div.style.width = this.width + "px";
+  div.style.height= this.height + "px";
+  div.style.position = 'relative';
+  div.appendChild(canvas);
+  return div;
 };
 
 function map_move_no_filter(map, drag) {
@@ -203,9 +223,10 @@ function Map(el, opts) {
     this.el = el;
     this.projection = new MercatorProjection();
     this.resize();
+    this.lastTime = 0;
 
-    this.on('center_changed', this._render.bind(this));
-    this.on('zoom_changed', this._render.bind(this));
+    this.on('change:center', this.requestRender.bind(this));
+    this.on('change:zoom', this.requestRender.bind(this));
 
     this.drag = new dragger(this.el);
 
@@ -219,25 +240,40 @@ function Map(el, opts) {
     map_move_no_filter(this, this.drag);
 }
 
+var c = 0;
 Map.prototype = new Event();
 FM.extend(Map.prototype, Node.prototype);
 FM.extend(Map.prototype, {
 
-  render: function() {
+  requestRender: function() {
     if (!this.rendering) {
       this.rendering = true;
-      FM.cancelAnimationFrame.call(window, this.currentFrame);
-      this.currentFrame = FM.requestAnimFrame.call(window, this._render.bind(this));
+      FM.cancelAnimationFrame.call(root, this.currentFrame);
+      this.currentFrame = FM.requestAnimFrame.call(root, this._render.bind(this));
     }
-
   },
 
   _render: function() {
     var scale = Math.pow(2, this.zoom);
     var translate = this.projection.fromLatLngToPoint(this.center);
-    for (var k in this.layers) {
+    var lyr, k;
+    
+    var now = Date.now();
+    var dt = now - this.lastTime;
+    this.lastTime = now;
+
+    // update the tree
+    for (k in this.layers) {
       if (this.layers.hasOwnProperty(k)) {
-        var lyr = this.layers[k];
+        lyr = this.layers[k];
+        lyr.update(dt);
+      }
+    }
+
+    // render
+    for (k in this.layers) {
+      if (this.layers.hasOwnProperty(k)) {
+        lyr = this.layers[k];
         lyr.ctx.resetTransform();
         lyr.ctx.clearRect(0, 0, lyr.width, lyr.height);
 
@@ -260,8 +296,8 @@ FM.extend(Map.prototype, {
 
   setCenter: function(center) {
     this.center = new LatLng(center.lat, center.lng);
-    this.emit('center_changed', this.center);
-    this.render();
+    this.emit('change:center', this.center);
+    this.requestRender();
   },
 
   getCenterPixel: function() {
@@ -270,22 +306,26 @@ FM.extend(Map.prototype, {
 
   setZoom: function(zoom) {
     this.zoom = zoom;
-    this.emit('zoom_changed', this.zoom);
-    this.render();
+    this.emit('change:zoom', this.zoom);
+    this.requestRender();
   }
 
 });
 
 
-function TiledLayer() {
+function TiledLayer(tile_size) {
+  Node.call(this);
   this.tiles = {};
+  this.tile_size = tile_size || 256;
 }
+
+FM.extend(TiledLayer.prototype, Node.prototype);
 
 TiledLayer.prototype.tileKey = function(t) {
   return t.zoom + "-" + t.x + "-" + t.y;
 };
 
-TiledLayer.prototype.render = function() {
+TiledLayer.prototype.update = function() {
   this.updateTiles();
 };
 
@@ -298,7 +338,7 @@ TiledLayer.prototype.onAdd = function(layer) {
     center.x -= layer.width/2.0;
     center.y -= layer.height/2.0;
     var intZoom = Math.ceil(map.zoom);
-    var tileSize = 256 / Math.pow(2, intZoom - map.zoom);
+    var tileSize = self.tile_size/Math.pow(2, intZoom - map.zoom);
     var t = self.visibleTiles(center, intZoom, tileSize, layer.width, layer.height);
     var tileKeys = {};
     for (i = 0; i < t.length; ++i) {
@@ -321,22 +361,79 @@ TiledLayer.prototype.onAdd = function(layer) {
  * the center will be placed on the center of that zone
  */
 TiledLayer.prototype.visibleTiles = function(center, zoom, ts, width, height) {
-    var pixelToTile = function(pixelCoordinate) {
-      return new Point(
-        Math.floor(pixelCoordinate.x / ts),
-        Math.floor(pixelCoordinate.y / ts));
-    };
-    var tile = pixelToTile(center);
-    var tile_to = pixelToTile({ x: center.x + width, y: center.y + height });
+  var pixelToTile = function(pixelCoordinate) {
+    return new Point(
+      Math.floor(pixelCoordinate.x / ts),
+      Math.floor(pixelCoordinate.y / ts));
+  };
+  var tile = pixelToTile(center);
+  var tile_to = pixelToTile({ x: center.x + width, y: center.y + height });
 
-    var tiles = [];
-    var z = zoom;
-    for(var i = tile.x; i < tile_to.x + 1; ++i) {
-        for(var j = tile.y; j < tile_to.y + 1; ++j) {
-            tiles.push({ x: i, y: j, zoom: z, });
-        }
+  var tiles = [];
+  var z = zoom;
+  for(var i = tile.x; i <= tile_to.x; ++i) {
+    for(var j = tile.y; j <= tile_to.y; ++j) {
+      tiles.push({ x: i, y: j, zoom: z, });
     }
-    return tiles;
-
+  }
+  return tiles;
 };
+
+//
+// templated tiled layer
+//
+function TemplateTiledLayer(template) {
+  this.template = template;
+  TiledLayer.call(this, 256);
+}
+
+FM.extend(TemplateTiledLayer.prototype, TiledLayer.prototype);
+
+TemplateTiledLayer.prototype.render = function(ctx) {
+  TiledLayer.prototype.render.call(this, ctx);
+  var self = this;
+  var x, y;
+  for(var t in this.tiles) {
+  ctx.save();
+  var tile = this.tiles[t];
+  var s = 1/Math.pow(2, tile.zoom);
+  ctx.transform(s, 0, 
+                0, s,
+                s*tile.x*256 - 128, 
+                s*tile.y*256 - 128);
+                
+    ctx.strokeRect(0, 0, 256, 256);
+    ctx.fillText(tile.zoom + "/" + tile.x + "/" + tile.y, 0, 0);
+
+    var tile = this.tiles[t];
+    if (!tile.img) {
+      tile._loaded = false;
+      var maxTiles = 1 << tile.zoom;
+      x = tile.x < 0 ? maxTiles - ((-tile.x)%maxTiles): tile.x;
+      y = tile.y < 0 ? maxTiles - tile.y: tile.y;
+      x = x%maxTiles;
+      y = y%maxTiles;
+      var url = this.template
+        .replace('{z}', tile.zoom)
+        .replace('{x}', x)
+        .replace('{y}', y);
+      tile.img = new Image();
+      tile.img.src = url;
+      tile.img.onload = (function(t) {
+        return function() {
+          t._loaded = true;
+          self.parent.requestRender();
+        //self.root.render();
+        }
+      })(tile)
+      tile.img.onerror = function() {
+        console.log("err", tile.img.src);
+      }
+    }
+    if (tile._loaded) {
+      ctx.drawImage(tile.img, 0, 0);
+    }
+  ctx.restore()
+  }
+}
 
