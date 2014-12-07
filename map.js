@@ -1,14 +1,35 @@
-"use strict";
 // TODO:
 // - remove Point
 // - move clear to layer
 // - LatLng allow to be constructed with Array
 // - manage resize
+//
 
-var FM = typeof module !== 'undefined' ? module.exports : {};
+(function(root, fm) {
+  if (typeof exports !== 'undefined') {
+    fm(exports);
+  } else {
+    // export globaly
+    root.FM = {};
+    fm(root.FM);
+  }
+})(this, function(FM) {
+"use strict";
 
-var root = this;
 
+/*
+===============================================================================
+
+CORE STUFF
+
+===============================================================================
+*/
+
+/*
+=================
+animation functions
+=================
+*/
 FM.requestAnimFrame = root.requestAnimationFrame ||
   root.webkitRequestAnimationFrame ||
   root.mozRequestAnimationFrame    ||
@@ -21,6 +42,11 @@ FM.cancelAnimationFrame = root.cancelAnimationFrame ||
   root.webkitCancelAnimationFrame||
   function(c) { root.clearTimeout(c); };
 
+/*
+=================
+_.extend
+=================
+*/
 FM.extend = function() {
   var objs = arguments;
   var a = objs[0];
@@ -31,17 +57,149 @@ FM.extend = function() {
   return a;
 };
 
+
+/*
+===============================================================================
+
+MATH STUFF
+
+===============================================================================
+*/
+
+
+/*
+=================
+linear interpolation
+=================
+*/
 function linear(a, b, t) {
   return a * (1.0 - t) + t*b;
 }
 
+/*
+=================
+clamps t value between range [a, b]
+=================
+*/
 function clamp(a, b, t) {
   if (t < a) return a;
   if (t > b) return b;
   return t;
 }
 
-// basic event management
+/*
+=================
+3x3 float mat 
+=================
+*/
+
+function mat3(v) {
+  if (v && v.length !== 9) {
+    throw new Error("mat should be 3x3");
+  }
+  this.v = new Float32Array(v || 9);
+}
+
+mat3.prototype = {
+
+  scale: function(s) {
+    this.v[0] = s.v[0];
+    this.v[4] = s.v[1];
+    return this;
+  },
+
+  translate: function(t) {
+    this.v[6] = t.v[0];
+    this.v[7] = t.v[1];
+    return this;
+  }
+
+};
+
+/*
+=================
+2 component float vector
+=================
+*/
+function v2(x, y) {
+  this.v = new Float32Array(2);
+  this.v[0] = x;
+  this.v[1] = y;
+}
+
+v2.prototype = {
+  add: function(b) {
+    return new v2(this.v[0] + b.v[0], this.v[1] + b.v[1]);
+  },
+  madd: function(s, b) {
+    return new v2(this.v[0] + s*b.v[0], this.v[1] + s*b.v[1]);
+  },
+  vadd: function(v) {
+    return new v2(this.v[0] + v[0], this.v[1] + v[1]);
+  },
+  vmadd: function(s, v) {
+    return new v2(this.v[0] + s*v[0], this.v[1] + s*v[1]);
+  }
+};
+
+v2.prototype.__defineGetter__('x', function() {
+  return this.v[0];
+});
+
+v2.prototype.__defineGetter__('y', function() {
+  return this.v[1];
+});
+
+var v2f = function(x, y) {
+  return new v2(x, y);
+}
+
+/*
+=================
+2 component int32 vector
+=================
+*/
+function v2i(x, y) {
+  this.v = new Int32Array(2);
+  this.v[0] = x >> 0;
+  this.v[1] = y >> 0;
+}
+
+function v2fAdd(a, b) {
+  a = a.v; b = b.v;
+  return new v2(a[0] + b[0], a[1] + b[1]);
+}
+
+function v2fSAdd(a, b) {
+  a = a.v; b = b.v;
+  a[0] += b[0];
+  a[1] += b[1];
+  return a;
+}
+
+function v2fFloor(v) {
+  v = v.v;
+  return new v2i(Math.floor(v[0]), Math.floor(v[1]));
+}
+
+function v2fCeil(v) {
+  v = v.v;
+  return new v2i(Math.ceil(v[0]), Math.ceil(v[1]));
+}
+
+function v2fSMulAdd(a, t, b) {
+  a = a.v; b = b.v;
+  a[0] += t*b[0];
+  a[1] += t*b[1];
+  return a;
+}
+
+
+/*
+=================
+Event mixin
+=================
+*/
 function Event() {}
 
 Event.prototype = {
@@ -63,6 +221,20 @@ Event.prototype = {
 
 };
 
+
+/*
+===============================================================================
+
+SCENEGRAPH
+
+===============================================================================
+*/
+
+/*
+=================
+animation helper
+=================
+*/
 function Anim(obj, prop, value, duration, callback) {
   this.key = "anim_" + prop;
   this.obj = obj;
@@ -100,7 +272,12 @@ Anim.prototype = {
 
 };
 
-// base Node, all the scenegraph objects should inherit this
+/*
+=================
+scenegraph Node, all the scenegraph objects should inherit this
+=================
+*/
+
 function Node() {
   this.objects = [];
   this._objectsKey = {};
@@ -187,90 +364,7 @@ Node.prototype = {
 
 };
 
-function DebugNode() {
-  Node.call(this);
-}
 
-FM.extend(DebugNode.prototype, Event.prototype, Node.prototype, {
-
-  update: function() {
-    this.emit('update');
-  }, 
-
-  render: function() {
-    this.emit('render');
-  }
-
-});
-
-
-function v2(x, y) {
-  this.v = new Float32Array(2);
-  this.v[0] = x;
-  this.v[1] = y;
-}
-
-v2.prototype = {
-  add: function(b) {
-    return new v2(this.v[0] + b.v[0], this.v[1] + b.v[1]);
-  },
-  madd: function(s, b) {
-    return new v2(this.v[0] + s*b.v[0], this.v[1] + s*b.v[1]);
-  },
-  vadd: function(v) {
-    return new v2(this.v[0] + v[0], this.v[1] + v[1]);
-  },
-  vmadd: function(s, v) {
-    return new v2(this.v[0] + s*v[0], this.v[1] + s*v[1]);
-  }
-};
-
-v2.prototype.__defineGetter__('x', function() {
-  return this.v[0];
-});
-
-v2.prototype.__defineGetter__('y', function() {
-  return this.v[1];
-});
-
-var v2f = function(x, y) {
-  return new v2(x, y);
-}
-
-function v2i(x, y) {
-  this.v = new Int32Array(2);
-  this.v[0] = x >> 0;
-  this.v[1] = y >> 0;
-}
-
-function v2fAdd(a, b) {
-  a = a.v; b = b.v;
-  return new v2(a[0] + b[0], a[1] + b[1]);
-}
-
-function v2fSAdd(a, b) {
-  a = a.v; b = b.v;
-  a[0] += b[0];
-  a[1] += b[1];
-  return a;
-}
-
-function v2fFloor(v) {
-  v = v.v;
-  return new v2i(Math.floor(v[0]), Math.floor(v[1]));
-}
-
-function v2fCeil(v) {
-  v = v.v;
-  return new v2i(Math.ceil(v[0]), Math.ceil(v[1]));
-}
-
-function v2fSMulAdd(a, t, b) {
-  a = a.v; b = b.v;
-  a[0] += t*b[0];
-  a[1] += t*b[1];
-  return a;
-}
 
 function LatLng(lat, lng) {
   this.latlng = new v2(lng, lat);
@@ -383,6 +477,7 @@ function Map(el, opts) {
     this.projection = new MercatorProjection();
     this.resize();
     this.lastTime = +Date.now();
+    this.transform = new mat3();
 
     this.on('change:center', this.requestRender.bind(this));
     this.on('change:zoom', this.requestRender.bind(this));
@@ -423,6 +518,10 @@ FM.extend(Map.prototype, Node.prototype, {
     this.lastTime = now;
 
     this.update(dt);
+
+    this.transform
+      .scale(v2f(scale, scale))
+      .translate(v2f(lyr.width/2 - (translate.v[0])*scale, lyr.height/2 - (translate.v[1])*scale));
 
     // render
     for (k in this.layers) {
@@ -691,3 +790,4 @@ FM.extend(Marker.prototype, Node.prototype, {
   }
 });
 
+});
