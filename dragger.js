@@ -41,4 +41,4 @@ function dragger(el) {
     };
 }
 
-dragger.prototype = new Event();
+dragger.prototype = new FM.Event();

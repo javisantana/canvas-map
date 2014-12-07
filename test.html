@@ -51,8 +51,8 @@
     <script src="map.js"></script>
     <script src="dragger.js"></script>
     <script>
-        var map = new Map(document.getElementById('map'), {
-            center: new LatLng(0, 0),
+        var map = new FM.Map(document.getElementById('map'), {
+            center: new FM.LatLng(0, 0),
             zoom: 0
         });
 
@@ -61,8 +61,8 @@
         //tmpl = "http://c.localhost.lan:8181/tiles/world_borders_3/{z}/{x}/{y}.png";
         tmpl = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 
-        map.layers.base.addChild(new TemplateTiledLayer(tmpl));
-        map.layers.base.addChild(new Marker(new LatLng(41.65, -4.72)));
+        map.layers.base.addChild(new FM.TemplateTiledLayer(tmpl));
+        map.layers.base.addChild(new FM.Marker(new FM.LatLng(41.65, -4.72)));
 
         map.layers.base.addChild({
           update: function() {
