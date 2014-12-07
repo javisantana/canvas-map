@@ -1,15 +1,4 @@
 
-  function Point(x, y) {
-      this.x = x;
-      this.y = y;
-  }
-
-  /** return a copy of this point with coordinates as int */
-  Point.prototype.floor = function() {
-      return new Point(this.x>>0, this.y>>0);
-  }
-
-
   var TILE_SIZE = 256;
 
   MercatorProjection.prototype.TILE_SIZE = TILE_SIZE;
@@ -29,40 +18,38 @@
   }
 
   function MercatorProjection() {
-    this.pixelOrigin_ = new Point(TILE_SIZE / 2,
-        TILE_SIZE / 2);
+    this.pixelOrigin_ = new v2(TILE_SIZE / 2, TILE_SIZE / 2);
     this.pixelsPerLonDegree_ = TILE_SIZE / 360;
     this.pixelsPerLonRadian_ = TILE_SIZE / (2 * Math.PI);
   }
 
   MercatorProjection.prototype.fromLatLngToPixel = function(latLng, zoom) {
       var p = this.fromLatLngToPoint(latLng);
+      //v2fSAdd(p, this.pixelOrigin_);
       return this.toPixelCoordinate(p, zoom);
   };
 
-  MercatorProjection.prototype.fromLatLngToPoint = function(latLng,
-      opt_point) {
+  MercatorProjection.prototype.fromLatLngToPoint = function(latLng) {
     var me = this;
-    var point = opt_point || new Point(0, 0);
-    var origin = me.pixelOrigin_;
+    var point = new v2(0, 0);
 
-    point.x = origin.x + latLng.lng * me.pixelsPerLonDegree_;
+    point.v[0] = latLng.lng() * me.pixelsPerLonDegree_;
 
     // NOTE(appleton): Truncating to 0.9999 effectively limits latitude to
     // 89.189.  This is about a third of a tile past the edge of the world
     // tile.
-    var siny = bound(Math.sin(degreesToRadians(latLng.lat)), -0.9999,
+    var siny = bound(Math.sin(degreesToRadians(latLng.lat())), -0.9999,
         0.9999);
-    point.y = origin.y + 0.5 * Math.log((1 + siny) / (1 - siny)) *
+    point.v[1] = 0.5 * Math.log((1 + siny) / (1 - siny)) *
         -me.pixelsPerLonRadian_;
     return point;
   };
 
   MercatorProjection.prototype.fromPointToLatLng = function(point) {
     var me = this;
-    var origin = me.pixelOrigin_;
-    var lng = (point.x - origin.x) / me.pixelsPerLonDegree_;
-    var latRadians = (point.y - origin.y) / -me.pixelsPerLonRadian_;
+    //var origin = me.pixelOrigin_;
+    var lng = point.v[0] / me.pixelsPerLonDegree_;
+    var latRadians = point.v[1] / -me.pixelsPerLonRadian_;
     var lat = radiansToDegrees(2 * Math.atan(Math.exp(latRadians)) -
         Math.PI / 2);
     return new LatLng(lat, lng);
@@ -74,8 +61,8 @@
     var px = x*TILE_SIZE/numTiles;
     var py = y*TILE_SIZE/numTiles;
     return [
-        this.fromPointToLatLng(new Point(px, py + inc)),
-        this.fromPointToLatLng(new Point(px + inc, py))
+        this.fromPointToLatLng(new v2(px, py + inc)),
+        this.fromPointToLatLng(new v2(px + inc, py))
     ];
   };
 
@@ -88,35 +75,35 @@
 
   MercatorProjection.prototype.toPixelCoordinate = function(worldCoordinate, zoom) {
         var numTiles = Math.pow(2, zoom);
-        return new Point(
-                worldCoordinate.x * numTiles,
-                worldCoordinate.y * numTiles);
+        return new v2(
+            worldCoordinate.v[0] * numTiles,
+            worldCoordinate.v[1] * numTiles);
   }
 
   MercatorProjection.prototype.latLngToTilePoint = function(latLng, x, y, zoom) {
         var numTiles = 1 << zoom;
         var projection = this;
         var worldCoordinate = projection.fromLatLngToPoint(latLng);
-        var pixelCoordinate = new Point(
-                worldCoordinate.x * numTiles,
-                worldCoordinate.y * numTiles);
+        var pixelCoordinate = new v2(
+                worldCoordinate.v[0] * numTiles,
+                worldCoordinate.v[1] * numTiles);
         var tp = this.tilePoint(x, y, zoom);
-        return new Point(
-                Math.floor(pixelCoordinate.x - tp[0]),
-                Math.floor(pixelCoordinate.y - tp[1]));
+        return v2fFloor(new v2(
+                pixelCoordinate.v[0] - tp[0],
+                pixelCoordinate.v[1] - tp[1]));
   }
 
   MercatorProjection.prototype.pixelToTile = function(pixelCoordinate) {
-        return new Point(
-                Math.floor(pixelCoordinate.x / TILE_SIZE),
-                Math.floor(pixelCoordinate.y / TILE_SIZE));
+        return v2fFloor(new v2(
+                pixelCoordinate.v[0] / TILE_SIZE,
+                pixelCoordinate.v[1] / TILE_SIZE));
   };
 
   MercatorProjection.prototype.pointToTile = function(point, zoom) {
         var numTiles = 1 << zoom;
-        var pixelCoordinate = new Point(
-                point.x * numTiles,
-                point.y * numTiles);
+        var pixelCoordinate = new v2(
+                point.v[0] * numTiles,
+                point.v[1] * numTiles);
         return this.pixelToTile(pixelCoordinate);
   };
 
@@ -124,10 +111,10 @@
         var numTiles = 1 << zoom;
         var projection = this;
         var worldCoordinate = projection.fromLatLngToPoint(latLng);
-        var pixelCoordinate = new Point(
-                worldCoordinate.x * numTiles,
-                worldCoordinate.y * numTiles);
-        return new Point(
-                Math.floor(pixelCoordinate.x / TILE_SIZE),
-                Math.floor(pixelCoordinate.y / TILE_SIZE));
+        var pixelCoordinate = new v2(
+                worldCoordinate.v[0] * numTiles,
+                worldCoordinate.v[1] * numTiles);
+        return new v2(
+                Math.floor(pixelCoordinate.v[0] / TILE_SIZE),
+                Math.floor(pixelCoordinate.v[1] / TILE_SIZE));
   }

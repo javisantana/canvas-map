@@ -58,19 +58,27 @@
 
         var tmpl = "http://c.localhost.lan:8181/api/v1/map/f80e94b453d0630a73224075ab99da8b:1413822359238.48/{z}/{x}/{y}.png?api_key=95c68e3085d245aeeb0d0a4345d3316fd3c8286b"
         tmpl = "http://tile.stamen.com/toner/{z}/{x}/{y}.png";
+        //tmpl = "http://c.localhost.lan:8181/tiles/world_borders_3/{z}/{x}/{y}.png";
+        tmpl = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 
-        
+        map.layers.base.addChild(new TemplateTiledLayer(tmpl));
+        map.layers.base.addChild(new Marker(new LatLng(41.65, -4.72)));
 
-        map.layers.base.addObject(new TemplateTiledLayer(tmpl));
-        map.layers.base.addObject({
+        map.layers.base.addChild({
           update: function() {
           },
           render: function(ctx) {
             ctx.fillRect(0, 0, 3, 3);
           }
         });
+        //map.addChild(new Anim(map, 'test', 10, 10*1000));
+        /*map.addChild(new DebugNode().on('update', function() {
+          console.log(map.test);
+        }));*/
+        var i;
         function animTo(z) {
-          var i = setInterval(function() {
+          clearInterval(i);
+          i = setInterval(function() {
             map.zoom += (z - map.zoom)*0.1;
             map.setZoom(map.zoom)
             if (Math.abs(map.zoom - z) <= 0.01) {
@@ -80,7 +88,7 @@
           }, 16)
         }
         document.getElementById('plus').onclick = function() {
-            //map.setZoom(map.zoom + 0.25);
+            //map.setZoom(map.zoom + 1);
             animTo(map.zoom + 1);
             return false;
         }
