@@ -78,7 +78,7 @@ function linear(a, b, t) {
 
 /*
 =================
-clamps t value between range [a, b]
+clamps t value in range [a, b]
 =================
 */
 function clamp(a, b, t) {
@@ -133,6 +133,11 @@ mat3.prototype = {
 
 };
 
+function mat3Mul(a, b) {
+  a = a.v; b = b.v;
+  return mat3([])
+}
+
 /*
 =================
 2 component float vector
@@ -169,6 +174,13 @@ v2.prototype.__defineGetter__('y', function() {
 
 var v2f = function(x, y) {
   return new v2(x, y);
+}
+
+function v2Linear(a, b, t) {
+  return v2f(
+    linear(a.v[0], b.v[0], t), 
+    linear(a.v[1], b.v[1], t)
+  )
 }
 
 /*
@@ -509,9 +521,6 @@ function Layer(container, map) {
 
   container.appendChild(this._createElement(container));
   var ctx = this.canvas.getContext('2d');
-  var widthHalf = this.width >> 1;
-  var heightHalf = this.height >> 1;
-  ctx.translate(widthHalf, heightHalf);
   this.ctx = ctx;
 }
 
@@ -545,6 +554,17 @@ function map_move_no_filter(map, drag) {
     v2fSMulAdd(pos, -s, new v2(dx, dy));
     var newLatLng = projection.fromPointToLatLng(pos);
     map.setCenter(newLatLng);
+ });
+ drag.on('dblclick', function(x, y) {
+   var v = v2f(x, y).vadd([-map.width/2, -map.height/2]);
+   var s = 1/Math.pow(2, map.zoom);
+   var pos = projection.fromLatLngToPoint(center_init);
+   v2fSMulAdd(pos, s, v);
+   //debugger
+   var newLatLng = projection.fromPointToLatLng(pos);
+   map.addChild(new Anim(map, 'center', newLatLng, 1000).interpolation(v2Linear));
+   map.requestRender();
+   //map.setCenter(newLatLng);
  });
 }
 
@@ -626,17 +646,16 @@ FM.extend(Map.prototype, Node.prototype, {
     var lyr, k;
     var scale = Math.pow(2, this.zoom);
     var translate = this.projection.fromLatLngToPoint(this.center);
-    
+
     var now = Date.now();
     var dt = now - this.lastTime;
     this.lastTime = now;
 
     this.update(dt);
 
-    /*this.transform
+    this.transform
       .scale(v2f(scale, scale))
-      .translate(v2f(lyr.width/2 - (translate.v[0])*scale, lyr.height/2 - (translate.v[1])*scale));
-      */
+      .translate(v2f(this.width/2 - (translate.v[0])*scale, this.height/2 - (translate.v[1])*scale));
 
 
     // render
@@ -646,10 +665,11 @@ FM.extend(Map.prototype, Node.prototype, {
         lyr.ctx.setTransform(1, 0, 0, 1, 0, 0);
         lyr.ctx.clearRect(0, 0, lyr.width, lyr.height);
 
+        var v = this.transform.v;
         lyr.ctx.setTransform(
-          scale, 0,
-          0, scale,
-         lyr.width/2 - (translate.v[0])*scale, lyr.height/2 - (translate.v[1])*scale
+          v[0], v[1], /* v[2] */
+          v[3], v[4], /* v[5] */
+          v[6], v[7] /* v[8] */
         );
 
         lyr.render(lyr.ctx);
@@ -665,6 +685,7 @@ FM.extend(Map.prototype, Node.prototype, {
   resize: function() {
     this.width = this.el.offsetWidth >> 0;
     this.height = this.el.offsetHeight >> 0;
+    this.requestRender();
   },
 
   setCenter: function(center) {
@@ -794,6 +815,16 @@ Tile.tileKey = function(t) {
   return t.zoom + "-" + t.x + "-" + t.y;
 };
 
+// wraps to coordinates in [0, 1 << tile.zoom]
+Tile.wrapCoord = function(tile) {
+    var maxTiles = 1 << tile.zoom, 
+        x = tile.x < 0 ? maxTiles - ((-tile.x)%maxTiles): tile.x,
+        y = tile.y < 0 ? maxTiles - tile.y: tile.y;
+    return {
+      x: x % maxTiles, y: y % maxTiles, zoom: tile.zoom
+    };
+};
+
 FM.extend(Tile.prototype, Node.prototype, {
 
   _subdomain: function(x, y) {
@@ -803,19 +834,14 @@ FM.extend(Tile.prototype, Node.prototype, {
   update: function(dt) {
     var self = this;
     var x,y;
-    var tile = this.coord;
+    var tile = Tile.wrapCoord(this.coord);
     if (!this.img) {
       this._loaded = false;
-      var maxTiles = 1 << tile.zoom;
-      x = tile.x < 0 ? maxTiles - ((-tile.x)%maxTiles): tile.x;
-      y = tile.y < 0 ? maxTiles - tile.y: tile.y;
-      x = x%maxTiles;
-      y = y%maxTiles;
       var url = this.parent.template
-        .replace('{s}', self._subdomain(x, y))
+        .replace('{s}', self._subdomain(tile.x, tile.y))
         .replace('{z}', tile.zoom)
-        .replace('{x}', x)
-        .replace('{y}', y);
+        .replace('{x}', tile.x)
+        .replace('{y}', tile.y);
       var img = this.img = new Image();
       img.src = url;
       img.onload = function() {
@@ -837,25 +863,34 @@ FM.extend(Tile.prototype, Node.prototype, {
     if (!this._loaded) {
       return;
     }
-    ctx.save();
     var coord = this.coord;
     var s = 1/Math.pow(2, coord.zoom);
     ctx.transform(s, 0,
                   0, s,
                   s*coord.x*256 - 128,
                   s*coord.y*256 - 128);
+    var oldAlpha = ctx.globalAlpha;
     ctx.globalAlpha = this.opacity;
 
-    //ctx.strokeRect(0, 0, 256, 256);
-    //ctx.fillText(coord.zoom + "/" + coord.x + "/" + coord.y, 0, 0);
+    ctx.strokeRect(0, 0, 256, 256);
+    ctx.fillText(coord.zoom + "/" + coord.x + "/" + coord.y, 0, 0);
     ctx.drawImage(this.img, 0, 0);
-    ctx.restore();
+    ctx.globalAlpha = oldAlpha;
+    var v = this.root.transform.v;
+    ctx.setTransform(v[0], v[1],  v[3], v[4], v[6], v[7]);
   },
 
   show: function() {
   },
 
   hide: function() {
+    // when tile is not loaded, cancel the request and mark as removeable
+    if (!this._loaded) {
+      var img = this.img;
+      img.src = img.onerror = img.onload = null;
+      this._remove = true;
+      return;
+    }
     var self = this;
     if (!this.getByKey('anim_opacity')) {
       this.animate('opacity', 0, 750, function() {

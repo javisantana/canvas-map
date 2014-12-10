@@ -58,8 +58,8 @@
 
         var tmpl = "http://c.localhost.lan:8181/api/v1/map/f80e94b453d0630a73224075ab99da8b:1413822359238.48/{z}/{x}/{y}.png?api_key=95c68e3085d245aeeb0d0a4345d3316fd3c8286b"
         tmpl = "http://tile.stamen.com/toner/{z}/{x}/{y}.png";
-        //tmpl = "http://c.localhost.lan:8181/tiles/world_borders_3/{z}/{x}/{y}.png";
-        tmpl = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+        tmpl = "http://c.localhost.lan:8181/tiles/world_borders_3/{z}/{x}/{y}.png";
+        //tmpl = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 
         map.layers.base.addChild(new FM.TemplateTiledLayer(tmpl));
         map.layers.base.addChild(new FM.Marker(new FM.LatLng(41.65, -4.72)));

@@ -8,6 +8,17 @@ function dragger(el) {
     var dragging = false;
     var x, y;
 
+    el.ondblclick = function(e) {
+        if (e.touches) {
+            var p = e.touches[0];
+            x = p.pageX;
+            y = p.pageY;
+        } else {
+            x = e.clientX;
+            y = e.clientY;
+        }
+        self.emit('dblclick', x, y);
+    }
     el.ontouchstart = el.onmousedown = function(e) {
         dragging = true;
         if (e.touches) {
@@ -32,7 +43,9 @@ function dragger(el) {
             xx = e.clientX;
             yy = e.clientY;
         }
-        self.emit('move', xx - x, yy - y);
+        var dx = xx - x;
+        var dy = yy - y;
+        self.emit('move', dx, dy);
         return false;
     };
 
