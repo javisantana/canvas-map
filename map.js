@@ -1,7 +1,5 @@
 // TODO:
-// - remove Point
 // - move clear to layer
-// - LatLng allow to be constructed with Array
 // - manage resize
 //
 
@@ -89,6 +87,16 @@ function clamp(a, b, t) {
 
 /*
 =================
+smoothstep
+=================
+*/
+function smoothstep(a, b, t) {
+  t = (t - a)/(b - a);
+  return t*t*(3 - 2*t);
+}
+
+/*
+=================
 deg 2 rad
 =================
 */
@@ -163,7 +171,7 @@ v2.prototype = {
     return new v2(this.v[0] + s*v[0], this.v[1] + s*v[1]);
   }
 };
-
+/*
 v2.prototype.__defineGetter__('x', function() {
   return this.v[0];
 });
@@ -171,6 +179,7 @@ v2.prototype.__defineGetter__('x', function() {
 v2.prototype.__defineGetter__('y', function() {
   return this.v[1];
 });
+*/
 
 var v2f = function(x, y) {
   return new v2(x, y);
@@ -332,6 +341,7 @@ Event.prototype = {
     l.push(callback);
     return this;
   },
+  //TODO: off
 
   emit: function(evt) {
     var c = this.callbacks && this.callbacks[evt];
@@ -369,7 +379,11 @@ function Anim(obj, prop, value, duration, callback) {
   this.duration = duration;
   this.callback = callback;
   this._interpolation = linear;
+  this._easing = function(t) { return clamp(0, 1, t); }
 }
+
+Anim.smoothstep = function(t) { return smoothstep(0, 1, t); }
+
 
 Anim.prototype = {
 
@@ -378,9 +392,14 @@ Anim.prototype = {
     return this;
   },
 
+  easing: function(_) {
+    this._easing = _;
+    return this;
+  },
+
   update: function(dt) {
     this.time += dt;
-    var t = clamp(0, 1, this.time/this.duration);
+    var t = this._easing(this.time/this.duration);
     this.obj[this.prop] = this._interpolation(this.initialValue, this.value, t);
     if (this.time >= this.duration) {
       return Node.REMOVE;
@@ -560,11 +579,9 @@ function map_move_no_filter(map, drag) {
    var s = 1/Math.pow(2, map.zoom);
    var pos = projection.fromLatLngToPoint(center_init);
    v2fSMulAdd(pos, s, v);
-   //debugger
    var newLatLng = projection.fromPointToLatLng(pos);
-   map.addChild(new Anim(map, 'center', newLatLng, 1000).interpolation(v2Linear));
-   map.requestRender();
-   //map.setCenter(newLatLng);
+   map.setCenter(newLatLng, { animate: true });
+   map.setZoom(map.zoom + 1, { animate: true });
  });
 }
 
@@ -628,7 +645,9 @@ function Map(el, opts) {
     map_move_no_filter(this, this.drag);
 }
 
-var c = 0;
+Map.ZOOM_ANIMATION_TIME = 250;
+Map.PAN_ANIMATION_TIME = 250;
+
 Map.prototype = new Event();
 FM.extend(Map.prototype, Node.prototype, {
 
@@ -650,6 +669,12 @@ FM.extend(Map.prototype, Node.prototype, {
     var now = Date.now();
     var dt = now - this.lastTime;
     this.lastTime = now;
+
+    // there is no continous rendering so if the delta time is
+    // large, make it small
+    if (dt > 100) {
+      dt = 16.6; // ~60FPS
+    }
 
     this.update(dt);
 
@@ -688,19 +713,39 @@ FM.extend(Map.prototype, Node.prototype, {
     this.requestRender();
   },
 
-  setCenter: function(center) {
-    this.center = center.clone();
-    this.emit('change:center', this.center);
-    this.requestRender();
+  setCenter: function(center, options) {
+    options = options || { animate: false };
+    if (options.animate) {
+      var projection = this.projection;
+      var centerAnim = new Anim(map, 'center', center, Map.PAN_ANIMATION_TIME)
+        .interpolation(function(a, b, t) {
+            var pa = projection.fromLatLngToPoint(a);
+            var pb = projection.fromLatLngToPoint(b);
+            return projection.fromPointToLatLng(v2Linear(pa, pb, t));
+        }).easing(Anim.smoothstep);
+      this.addChild(centerAnim);
+      map.requestRender();
+    } else {
+      this.center = center.clone();
+      this.emit('change:center', this.center);
+      this.requestRender();
+    }
   },
 
   getCenterPixel: function() {
     return this.projection.fromLatLngToPixel(this.center, this.zoom);
   },
 
-  setZoom: function(zoom) {
-    this.zoom = zoom;
-    this.emit('change:zoom', this.zoom);
+  setZoom: function(zoom, options) {
+    options = options || { animate: false };
+    if (options.animate) {
+      this.addChild(new Anim(map, 'zoom', map.zoom + 1, Map.ZOOM_ANIMATION_TIME).easing(function(t) {
+        return smoothstep(0, 1, t);
+      }));
+    } else {
+      this.zoom = zoom;
+      this.emit('change:zoom', this.zoom);
+    }
     this.requestRender();
   },
 
@@ -829,7 +874,15 @@ FM.extend(Tile.prototype, Node.prototype, {
 
   _subdomain: function(x, y) {
     return 'abcd'[Math.abs(x + y)%4]
-  }, 
+  },
+
+  url: function(tile) {
+    return this.parent.template
+        .replace('{s}', this._subdomain(tile.x, tile.y))
+        .replace('{z}', tile.zoom)
+        .replace('{x}', tile.x)
+        .replace('{y}', tile.y);
+  },
 
   update: function(dt) {
     var self = this;
@@ -837,13 +890,8 @@ FM.extend(Tile.prototype, Node.prototype, {
     var tile = Tile.wrapCoord(this.coord);
     if (!this.img) {
       this._loaded = false;
-      var url = this.parent.template
-        .replace('{s}', self._subdomain(tile.x, tile.y))
-        .replace('{z}', tile.zoom)
-        .replace('{x}', tile.x)
-        .replace('{y}', tile.y);
       var img = this.img = new Image();
-      img.src = url;
+      img.src = this.url(tile);
       img.onload = function() {
         self._loaded = true;
         if (!self.getByKey('anim_opacity')) {
@@ -852,7 +900,7 @@ FM.extend(Tile.prototype, Node.prototype, {
         }
       };
       img.onerror = function() {
-        console.log("err", img.src);
+        //console.log("err", img.src);
       };
     }
     Node.prototype.update.call(this, dt);
@@ -872,16 +920,15 @@ FM.extend(Tile.prototype, Node.prototype, {
     var oldAlpha = ctx.globalAlpha;
     ctx.globalAlpha = this.opacity;
 
-    ctx.strokeRect(0, 0, 256, 256);
-    ctx.fillText(coord.zoom + "/" + coord.x + "/" + coord.y, 0, 0);
+    //ctx.strokeRect(0, 0, 256, 256);
+    //ctx.fillText(coord.zoom + "/" + coord.x + "/" + coord.y, 0, 0);
     ctx.drawImage(this.img, 0, 0);
     ctx.globalAlpha = oldAlpha;
     var v = this.root.transform.v;
     ctx.setTransform(v[0], v[1],  v[3], v[4], v[6], v[7]);
   },
 
-  show: function() {
-  },
+  show: function() { },
 
   hide: function() {
     // when tile is not loaded, cancel the request and mark as removeable
