@@ -1,0 +1,30 @@
+{
+  "name": "FM",
+  "version": "1.0.0",
+  "description": "This mapping library for the browser, it allows to create slippy maps.",
+  "main": "map.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "tape": "^3.0.3",
+    "testling": "^1.7.1"
+  },
+  "devDependencies": {
+    "tape": "^3.0.3",
+    "testling": "^1.7.1"
+  },
+  "scripts": {
+    "test": "node test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/javisantana/canvas-map.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/javisantana/canvas-map/issues"
+  },
+  "homepage": "https://github.com/javisantana/canvas-map"
+}

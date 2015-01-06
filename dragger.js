@@ -8,6 +8,11 @@ function dragger(el) {
     var dragging = false;
     var x, y;
 
+
+    el.onmousewheel = function(e) {
+      self.emit('wheelDelta', e.wheelDeltaY)
+    }
+
     el.ondblclick = function(e) {
         if (e.touches) {
             var p = e.touches[0];

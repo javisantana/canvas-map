@@ -58,8 +58,9 @@
 
         var tmpl = "http://c.localhost.lan:8181/api/v1/map/f80e94b453d0630a73224075ab99da8b:1413822359238.48/{z}/{x}/{y}.png?api_key=95c68e3085d245aeeb0d0a4345d3316fd3c8286b"
         tmpl = "http://tile.stamen.com/toner/{z}/{x}/{y}.png";
-        tmpl = "http://c.localhost.lan:8181/tiles/world_borders_3/{z}/{x}/{y}.png";
-        tmpl = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+        //tmpl = "http://c.localhost.lan:8181/tiles/world_borders_3/{z}/{x}/{y}.png";
+        //tmpl = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+        tmpl = "http://1.maps.nlp.nokia.com/maptile/2.1/maptile/newest/satellite.day/{z}/{x}/{y}/256/png8?lg=eng&token=A7tBPacePg9Mj_zghvKt9Q&app_id=KuYppsdXZznpffJsKT24"
 
         map.layers.base.addChild(new FM.TemplateTiledLayer(tmpl));
         map.layers.base.addChild(new FM.Marker(new FM.LatLng(41.65, -4.72)));
@@ -71,6 +72,7 @@
             ctx.fillRect(0, 0, 3, 3);
           }
         });
+map.setRotation(0.2);
         //map.addChild(new Anim(map, 'test', 10, 10*1000));
         /*map.addChild(new DebugNode().on('update', function() {
           console.log(map.test);
@@ -88,15 +90,26 @@
           }, 16)
         }
         document.getElementById('plus').onclick = function() {
-            //map.setZoom(map.zoom + 1);
-            animTo(map.zoom + 1);
+            map.setZoom(map.zoom + 1, { animate: true });
             return false;
         }
         document.getElementById('minus').onclick = function() {
-            //map.setZoom(map.zoom - 0.25);
-            animTo(map.zoom - 1);
+            map.setZoom(map.zoom - 1, { animate: true });
             return false;
         }
+
+        function Label(text, pos) {
+          this.text = text;
+          FM.Marker.call(this, pos);
+        }
+      
+        FM.extend(Label.prototype, FM.Marker.prototype, {
+          render: function(ctx) {
+            ctx.fillText(this.text, 0, 0);
+          }
+        });
+
+        map.layers.base.addChild(new Label("test", new FM.LatLng(41.65, -4.72)));
 
     </script>
 </html>

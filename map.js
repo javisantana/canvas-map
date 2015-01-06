@@ -5,7 +5,7 @@
 
 (function(root, fm) {
   if (typeof exports !== 'undefined') {
-    fm(exports);
+    fm(exports, process);
   } else {
     // export globaly
     root.FM = {};
@@ -28,16 +28,16 @@ CORE STUFF
 animation functions
 =================
 */
-FM.requestAnimFrame = requestAnimationFrame ||
-  webkitRequestAnimationFrame ||
-  mozRequestAnimationFrame    ||
-  oRequestAnimationFrame      ||
-  msRequestAnimationFrame     ||
+FM.requestAnimFrame = root.requestAnimationFrame ||
+  root.webkitRequestAnimationFrame ||
+  root.mozRequestAnimationFrame    ||
+  root.oRequestAnimationFrame      ||
+  root.msRequestAnimationFrame     ||
   function(callback){ return setTimeout(callback, 1000 / 60); };
 
-FM.cancelAnimationFrame = cancelAnimationFrame ||
-  mozCancelAnimationFrame ||
-  webkitCancelAnimationFrame||
+FM.cancelAnimationFrame = root.cancelAnimationFrame ||
+  root.mozCancelAnimationFrame ||
+  root.webkitCancelAnimationFrame||
   function(c) { clearTimeout(c); };
 
 /*
@@ -123,23 +123,75 @@ function mat3(v) {
     throw new Error("mat should be 3x3");
   }
   this.v = new Float32Array(v || 9);
+  if (!v) {
+    this.identity();
+  }
 }
 
 mat3.prototype = {
 
-  scale: function(s) {
-    this.v[0] = s.v[0];
-    this.v[4] = s.v[1];
+  identity: function() {
+    var v = this.v;
+    v[1] = v[2] = v[3] = v[5] = v[6] = v[7] = 0;
+    v[0] = v[4] = v[8] = 1;
     return this;
   },
 
-  translate: function(t) {
-    this.v[6] = t.v[0];
-    this.v[7] = t.v[1];
+  // multiply with other matrix: 
+  // this = this * m
+  mul: function(m) {
+    var v0 = this.v;
+    var v1 = m.v;
+    var a11 = v0[0], a12 = v0[3], a13 = v0[6];
+    var a21 = v0[1], a22 = v0[4], a23 = v0[7];
+    var a31 = v0[2], a32 = v0[5], a33 = v0[8];
+
+    var b11 = v1[0], b12 = v1[3], b13 = v1[6];
+    var b21 = v1[1], b22 = v1[4], b23 = v1[7];
+    var b31 = v1[2], b32 = v1[5], b33 = v1[8];
+
+    v0[0] = a11 * b11 + a12 * b21 + a13 * b31;
+    v0[3] = a11 * b12 + a12 * b22 + a13 * b32;
+    v0[6] = a11 * b13 + a12 * b23 + a13 * b33;
+
+    v0[1] = a21 * b11 + a22 * b21 + a23 * b31;
+    v0[4] = a21 * b12 + a22 * b22 + a23 * b32;
+    v0[7] = a21 * b13 + a22 * b23 + a23 * b33;
+
+    v0[2] = a31 * b11 + a32 * b21 + a33 * b31;
+    v0[5] = a31 * b12 + a32 * b22 + a33 * b32;
+    v0[8] = a31 * b13 + a32 * b23 + a33 * b33;
     return this;
   }
 
 };
+
+// matrix factories
+mat3.scale =function(s) {
+  var m = new mat3();
+  m.v[0] = s.v[0];
+  m.v[4] = s.v[1];
+  return m;
+},
+
+mat3.translate = function(t) {
+  var m = new mat3();
+  m.v[6] = t.v[0];
+  m.v[7] = t.v[1];
+  return m;
+},
+
+mat3.rotateZ = function(radians) {
+  var m = new mat3();
+  var c = Math.cos(radians);
+  var s = Math.sin(radians);
+  var v = m.v;
+  v[0] = c;
+  v[1] = -s;
+  v[3] = s;
+  v[4] = c;
+  return m;
+}
 
 function mat3Mul(a, b) {
   a = a.v; b = b.v;
@@ -171,6 +223,7 @@ v2.prototype = {
     return new v2(this.v[0] + s*v[0], this.v[1] + s*v[1]);
   }
 };
+
 /*
 v2.prototype.__defineGetter__('x', function() {
   return this.v[0];
@@ -383,6 +436,12 @@ function Anim(obj, prop, value, duration, callback) {
 }
 
 Anim.smoothstep = function(t) { return smoothstep(0, 1, t); }
+Anim.smoothstep = function(t) { return Math.sqrt(t)}
+Anim.cubic = function (t) {
+  return smoothstep(0, 1, Math.pow(t, 0.3));
+}
+
+
 
 
 Anim.prototype = {
@@ -540,6 +599,11 @@ function Layer(container, map) {
 
   container.appendChild(this._createElement(container));
   var ctx = this.canvas.getContext('2d');
+
+  /*ctx.mozImageSmoothingEnabled = false;
+  ctx.webkitImageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = false;
+  */
   this.ctx = ctx;
 }
 
@@ -552,6 +616,7 @@ Layer.prototype._createElement = function(el) {
   canvas.style.position = 'absolute';
   canvas.width = this.width;
   canvas.height = this.height;
+
 
   var div = document.createElement('div');
   div.style.width = this.width + "px";
@@ -567,6 +632,10 @@ function map_move_no_filter(map, drag) {
   drag.on('startdrag', function() {
     center_init = map.center.clone();
   });
+  drag.on('wheelDelta', function(d) {
+   map.setZoom(map.zoom + d/1000, { animate: false });
+  });
+
   drag.on('move', function(dx, dy) {
     var s = 1/Math.pow(2, map.zoom);
     var pos = projection.fromLatLngToPoint(center_init);
@@ -585,38 +654,6 @@ function map_move_no_filter(map, drag) {
  });
 }
 
-function map_move_filter(map, drag) {
-    var center_init = map.center.clone();
-    var target_center = new LatLng();
-    this.drag.on('startdrag', function() {
-      center_init = map.center.clone();
-    });
-
-    function go_to_target() {
-      var c = map.center;
-      var t = target_center;
-      var dlat = t.lat - c.lat;
-      var dlon = t.lng - c.lng;
-      var delta_lat = 0.1*dlat;
-      var delta_lon = 0.1*dlon;
-      t.lat += delta_lat;
-      t.lng += delta_lon;
-      map.setCenter(t);
-      if(Math.abs(dlat) + Math.abs(dlon) > 0.0001) {
-        FM.requestAnimFrame(go_to_target);
-      }
-    }
-
-    this.drag.on('move', function(dx, dy) {
-      var t = 1 << map.zoom;
-      var s = 1/t;
-      s = s/map.projection.pixelsPerLonDegree_;
-      target_center.lat = center_init.lat + dy*s;
-      target_center.lng = center_init.lng - dx*s;
-      FM.requestAnimFrame(go_to_target);
-    });
-}
-
 function Map(el, opts) {
     Node.call(this);
     opts = opts || {};
@@ -629,6 +666,7 @@ function Map(el, opts) {
     this.resize();
     this.lastTime = +Date.now();
     this.transform = new mat3();
+    this.rotation = 0;
 
     this.on('change:center', this.requestRender.bind(this));
     this.on('change:zoom', this.requestRender.bind(this));
@@ -678,9 +716,10 @@ FM.extend(Map.prototype, Node.prototype, {
 
     this.update(dt);
 
-    this.transform
-      .scale(v2f(scale, scale))
-      .translate(v2f(this.width/2 - (translate.v[0])*scale, this.height/2 - (translate.v[1])*scale));
+    this.transform.identity()
+      .mul(mat3.rotateZ(this.rotation))
+      .mul(mat3.translate(v2f(this.width/2 - (translate.v[0])*scale, this.height/2 - (translate.v[1])*scale)))
+      .mul(mat3.scale(v2f(scale, scale)))
 
 
     // render
@@ -713,6 +752,10 @@ FM.extend(Map.prototype, Node.prototype, {
     this.requestRender();
   },
 
+  setRotation: function(radians) {
+    this.rotation = radians;
+  },
+
   setCenter: function(center, options) {
     options = options || { animate: false };
     if (options.animate) {
@@ -722,7 +765,7 @@ FM.extend(Map.prototype, Node.prototype, {
             var pa = projection.fromLatLngToPoint(a);
             var pb = projection.fromLatLngToPoint(b);
             return projection.fromPointToLatLng(v2Linear(pa, pb, t));
-        }).easing(Anim.smoothstep);
+        }).easing(Anim.cubic);
       this.addChild(centerAnim);
       map.requestRender();
     } else {
@@ -739,9 +782,7 @@ FM.extend(Map.prototype, Node.prototype, {
   setZoom: function(zoom, options) {
     options = options || { animate: false };
     if (options.animate) {
-      this.addChild(new Anim(map, 'zoom', map.zoom + 1, Map.ZOOM_ANIMATION_TIME).easing(function(t) {
-        return smoothstep(0, 1, t);
-      }));
+      this.addChild(new Anim(map, 'zoom', zoom, Map.ZOOM_ANIMATION_TIME).easing(Anim.cubic));
     } else {
       this.zoom = zoom;
       this.emit('change:zoom', this.zoom);
@@ -912,11 +953,13 @@ FM.extend(Tile.prototype, Node.prototype, {
       return;
     }
     var coord = this.coord;
-    var s = 1/Math.pow(2, coord.zoom);
-    ctx.transform(s, 0,
-                  0, s,
-                  s*coord.x*256 - 128,
-                  s*coord.y*256 - 128);
+    var scale = Math.pow(2, coord.zoom);
+    var invScale = 1/scale;
+    ctx.transform(invScale, 0,
+                  0, invScale,
+                  coord.x*256/scale - 128,
+                  coord.y*256/scale - 128);
+
     var oldAlpha = ctx.globalAlpha;
     ctx.globalAlpha = this.opacity;
 
@@ -991,5 +1034,9 @@ FM.extend(Marker.prototype, Node.prototype, {
 FM.Map = Map;
 FM.TemplateTiledLayer = TemplateTiledLayer;
 FM.Marker = Marker;
+FM.v2 = v2;
+FM.v2Linear = v2Linear;
+FM.Node = Node;
+FM.mat3 = mat3;
 
 });
